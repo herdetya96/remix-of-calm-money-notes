@@ -17,8 +17,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const profile = useProfile();
 
-  const sidebarW = collapsed ? 0 : 240;
-
   return (
     <div className="min-h-screen bg-canvas text-ink-900">
       <aside
@@ -62,10 +60,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div
-        className="min-h-screen flex flex-col md:p-2 transition-[margin] duration-200"
-        style={{ marginLeft: `var(--shell-ml, 0px)` }}
+        className={
+          "min-h-screen flex flex-col md:p-2 transition-[margin] duration-200 " +
+          (collapsed ? "md:ml-0" : "md:ml-[240px]")
+        }
       >
-        <style>{`@media (min-width: 768px){:root{--shell-ml:${sidebarW}px}}`}</style>
         <div className="flex-1 flex flex-col bg-paper md:rounded-2xl md:shadow-[var(--shadow-xs)] overflow-hidden">
         <header className="h-12 sticky top-0 z-20 bg-paper/95 backdrop-blur flex items-center px-4 md:px-8 gap-3">
           <button
