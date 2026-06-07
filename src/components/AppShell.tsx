@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutGrid, ListOrdered, PieChart, Settings, Search, Plus } from "lucide-react";
+import { LayoutGrid, ListOrdered, PieChart, Settings, Search, Plus, PanelLeft } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { AddTransactionModal } from "./AddTransactionModal";
 import { useProfile } from "@/lib/store";
@@ -13,12 +13,20 @@ const NAV = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [addOpen, setAddOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const profile = useProfile();
 
+  const sidebarW = collapsed ? 0 : 240;
+
   return (
     <div className="min-h-screen bg-canvas text-ink-900">
-      <aside className="hidden md:flex fixed inset-y-0 left-0 w-[280px] flex-col px-4 py-5 bg-canvas">
+      <aside
+        className={
+          "hidden md:flex fixed inset-y-0 left-0 flex-col px-4 py-5 bg-canvas overflow-hidden transition-[width] duration-200 " +
+          (collapsed ? "w-0 p-0" : "w-[240px]")
+        }
+      >
         <div className="px-2 mb-6 flex items-center gap-2">
           <div className="h-6 w-6 rounded-md bg-ink-900 flex items-center justify-center text-paper text-[11px] font-semibold">L</div>
           <span className="text-[15px] font-semibold tracking-[-0.13px]">Ledger</span>
@@ -53,9 +61,21 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <div className="md:ml-[280px] min-h-screen flex flex-col md:p-2">
+      <div
+        className="min-h-screen flex flex-col md:p-2 transition-[margin] duration-200"
+        style={{ marginLeft: `var(--shell-ml, 0px)` }}
+      >
+        <style>{`@media (min-width: 768px){:root{--shell-ml:${sidebarW}px}}`}</style>
         <div className="flex-1 flex flex-col bg-paper md:rounded-2xl md:shadow-[var(--shadow-xs)] overflow-hidden">
         <header className="h-12 sticky top-0 z-20 bg-paper/95 backdrop-blur flex items-center px-4 md:px-8 gap-3">
+          <button
+            type="button"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-label="Toggle sidebar"
+            className="hidden md:flex h-8 w-8 rounded-md items-center justify-center text-ink-500 hover:bg-ink-40 hover:text-ink-900"
+          >
+            <PanelLeft className="h-4 w-4" strokeWidth={1.5} />
+          </button>
           <div className="md:hidden flex items-center gap-2">
             <div className="h-6 w-6 rounded-md bg-ink-900 flex items-center justify-center text-paper text-[11px] font-semibold">L</div>
             <span className="text-[15px] font-semibold tracking-[-0.13px]">Ledger</span>
