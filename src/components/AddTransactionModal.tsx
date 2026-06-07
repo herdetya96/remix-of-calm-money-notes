@@ -51,7 +51,7 @@ export function AddTransactionModal({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-[rgba(26,28,30,0.18)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className="fixed z-50 left-1/2 -translate-x-1/2 bottom-0 md:top-1/2 md:-translate-y-1/2 w-full md:max-w-md bg-paper rounded-t-2xl md:rounded-2xl shadow-[var(--shadow-md)] p-6 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 md:data-[state=closed]:zoom-out-95 md:data-[state=open]:zoom-in-95">
+        <Dialog.Content className="fixed z-50 left-1/2 -translate-x-1/2 bottom-0 md:top-1/2 md:-translate-y-1/2 w-full md:max-w-md max-h-[90vh] overflow-y-auto bg-paper rounded-t-2xl md:rounded-2xl shadow-[var(--shadow-md)] p-6 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 md:data-[state=closed]:zoom-out-95 md:data-[state=open]:zoom-in-95">
           <div className="flex items-center justify-between mb-5">
             <Dialog.Title className="text-[15px] font-semibold text-ink-900 tracking-[-0.13px]">
               New transaction
