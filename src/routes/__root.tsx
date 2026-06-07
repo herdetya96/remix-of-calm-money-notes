@@ -11,6 +11,8 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { AppShell } from "../components/AppShell";
+import { Toaster } from "sonner";
 
 function NotFoundComponent() {
   return (
@@ -77,16 +79,22 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "Ledger — Personal finance, paper-calm" },
+      { name: "description", content: "Track spending in under 5 seconds. A calm, paper-like personal finance tracker." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Ledger — Personal finance, paper-calm" },
+      { property: "og:description", content: "Track spending in under 5 seconds." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+      },
       {
         rel: "stylesheet",
         href: appCss,
@@ -118,8 +126,23 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <AppShell>
+        <Outlet />
+      </AppShell>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: "#ffffff",
+            color: "#1a1c1e",
+            borderRadius: "12px",
+            boxShadow: "0 1px 2px rgba(0,0,0,.05), 0 4px 4px rgba(0,0,0,.04), 0 9px 5px rgba(0,0,0,.03), 0 0 0 1px rgba(0,0,0,.03)",
+            borderLeft: "3px solid #2e6de9",
+            fontSize: "13px",
+            fontWeight: 500,
+          },
+        }}
+      />
     </QueryClientProvider>
   );
 }
