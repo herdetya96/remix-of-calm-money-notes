@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 import { useTransactions, useProfile } from "@/lib/store";
 import { formatMoney, formatLongDate } from "@/lib/format";
@@ -22,6 +22,7 @@ export const Route = createFileRoute("/")({
 function Dashboard() {
   const txs = useTransactions();
   const profile = useProfile();
+  const [period, setPeriod] = useState<"6M" | "3M" | "1M">("6M");
 
   const stats = useMemo(() => {
     const income = txs.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
@@ -32,7 +33,8 @@ function Dashboard() {
   const chartData = useMemo(() => {
     const now = new Date();
     const months: { key: string; label: string; income: number; expense: number }[] = [];
-    for (let i = 5; i >= 0; i--) {
+    const count = period === "6M" ? 6 : period === "3M" ? 3 : 1;
+    for (let i = count - 1; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       months.push({
         key: `${d.getFullYear()}-${d.getMonth()}`,
@@ -48,7 +50,7 @@ function Dashboard() {
       if (m) m[t.type] += t.amount;
     });
     return months;
-  }, [txs]);
+  }, [txs, period]);
 
   const recent = useMemo(
     () =>
@@ -75,13 +77,14 @@ function Dashboard() {
         <div className="flex items-center justify-between mb-4">
           <SectionLabel>Spending Overview</SectionLabel>
           <div className="flex gap-1">
-            {["6M", "3M", "1M"].map((p, i) => (
+            {(["6M", "3M", "1M"] as const).map((p) => (
               <button
                 key={p}
                 type="button"
+                onClick={() => setPeriod(p)}
                 className={
                   "h-7 px-3 rounded-[10px] text-[13px] font-medium transition-colors " +
-                  (i === 0 ? "bg-accent-100 text-accent" : "bg-ink-40 text-ink-400 hover:text-ink-700")
+                  (period === p ? "bg-accent-100 text-accent" : "bg-ink-40 text-ink-400 hover:text-ink-700")
                 }
               >
                 {p}
