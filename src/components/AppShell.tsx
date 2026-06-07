@@ -21,16 +21,16 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-canvas text-ink-900">
       <aside
         className={
-          "hidden md:flex fixed inset-y-0 left-0 flex-col px-4 py-5 bg-canvas overflow-hidden transition-[width] duration-200 " +
-          (collapsed ? "w-0 p-0" : "w-[240px]")
+          "hidden md:flex fixed inset-y-0 left-0 flex-col py-5 bg-canvas overflow-hidden transition-[width] duration-200 " +
+          (collapsed ? "w-[64px] px-2" : "w-[240px] px-4")
         }
       >
-        <div className="px-2 mb-6 flex items-center gap-2">
+        <div className={"mb-6 flex items-center gap-2 " + (collapsed ? "justify-center" : "px-2")}>
           <div className="h-6 w-6 rounded-md bg-ink-900 flex items-center justify-center text-paper text-[11px] font-semibold">L</div>
-          <span className="text-[15px] font-semibold tracking-[-0.13px]">Ledger</span>
+          {!collapsed && <span className="text-[15px] font-semibold tracking-[-0.13px]">Ledger</span>}
         </div>
 
-        <div className="eyebrow px-2 mb-2">Views</div>
+        {!collapsed && <div className="eyebrow px-2 mb-2">Views</div>}
         <nav className="flex flex-col gap-0.5">
           {NAV.map((item) => {
             const active = pathname === item.to;
@@ -39,30 +39,34 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={item.to}
                 to={item.to}
+                title={collapsed ? item.label : undefined}
                 className={
-                  "flex items-center gap-2 px-2 py-[7px] rounded-md text-[13px] leading-4 tracking-[-0.04px] transition-colors " +
+                  "flex items-center gap-2 py-[7px] rounded-md text-[13px] leading-4 tracking-[-0.04px] transition-colors " +
+                  (collapsed ? "justify-center px-0 h-9 w-full " : "px-2 ") +
                   (active
                     ? "bg-ink-60 text-ink-900 font-medium"
                     : "text-ink-700 hover:bg-ink-40")
                 }
               >
                 <Icon className="h-4 w-4" strokeWidth={1.5} />
-                <span>{item.label}</span>
+                {!collapsed && <span>{item.label}</span>}
               </Link>
             );
           })}
         </nav>
 
-        <div className="mt-auto px-2 pt-4">
-          <div className="text-[12px] text-ink-500">Signed in as</div>
-          <div className="text-[13px] font-medium text-ink-900 truncate">{profile.name}</div>
-        </div>
+        {!collapsed && (
+          <div className="mt-auto px-2 pt-4">
+            <div className="text-[12px] text-ink-500">Signed in as</div>
+            <div className="text-[13px] font-medium text-ink-900 truncate">{profile.name}</div>
+          </div>
+        )}
       </aside>
 
       <div
         className={
           "min-h-screen flex flex-col md:p-2 transition-[margin] duration-200 " +
-          (collapsed ? "md:ml-0" : "md:ml-[240px]")
+          (collapsed ? "md:ml-[64px]" : "md:ml-[240px]")
         }
       >
         <div className="flex-1 flex flex-col bg-paper md:rounded-2xl md:shadow-[var(--shadow-xs)] overflow-hidden">
