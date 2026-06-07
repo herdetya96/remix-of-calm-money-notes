@@ -53,8 +53,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <div className="md:ml-[280px] min-h-screen flex flex-col">
-        <header className="h-12 sticky top-0 z-20 bg-canvas/95 backdrop-blur flex items-center px-4 md:px-8 gap-3">
+      <div className="md:pl-[280px] min-h-screen flex flex-col md:p-2 md:pl-[280px]">
+        <div className="flex-1 flex flex-col bg-paper md:rounded-2xl md:shadow-[var(--shadow-xs)] overflow-hidden min-h-[calc(100vh-1rem)]">
+        <header className="h-12 sticky top-0 z-20 bg-paper/95 backdrop-blur flex items-center px-4 md:px-8 gap-3">
           <div className="md:hidden flex items-center gap-2">
             <div className="h-6 w-6 rounded-md bg-ink-900 flex items-center justify-center text-paper text-[11px] font-semibold">L</div>
             <span className="text-[15px] font-semibold tracking-[-0.13px]">Ledger</span>
@@ -81,6 +82,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main className="flex-1 px-4 md:px-8 pb-28 md:pb-12 max-w-[1200px] w-full mx-auto">
           {children}
         </main>
+        </div>
       </div>
 
       <button
