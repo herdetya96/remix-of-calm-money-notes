@@ -1,35 +1,54 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { ContactShadows, OrbitControls, RoundedBox } from "@react-three/drei";
-import { useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 /**
  * Motor 3D dengan bodi transparan — tangki bensin terlihat terisi
  * sesuai fillFrac. Garis merah menandai level pesanan pelanggan.
+ *
+ * Kursor di atas canvas berubah jadi nozzle SPBU: arahkan ke tangki
+ * lalu tahan klik untuk mengisi (onFillStart/onFillStop), atau pakai
+ * tombol merah di luar canvas.
  */
 export function Motorbike3D({
   fillFrac,
   targetFrac,
   filling,
+  onFillStart,
+  onFillStop,
 }: {
   fillFrac: number;
   targetFrac: number;
   filling: boolean;
+  onFillStart: () => void;
+  onFillStop: () => void;
 }) {
+  const [overTank, setOverTank] = useState(false);
+
   return (
-    <div className="w-full h-[280px] md:h-[340px] rounded-xl bg-gradient-to-b from-[#eef3fb] to-[#dde7f5] overflow-hidden">
+    <div className="w-full h-[280px] md:h-[340px] rounded-xl bg-gradient-to-b from-[#eef3fb] to-[#dde7f5] overflow-hidden cursor-none">
       <Canvas camera={{ position: [3.4, 2.2, 4.4], fov: 40 }} dpr={[1, 2]}>
         <ambientLight intensity={0.85} />
         <directionalLight position={[4, 7, 4]} intensity={1.4} />
         <directionalLight position={[-5, 3, -4]} intensity={0.4} />
-        <Scooter fillFrac={fillFrac} targetFrac={targetFrac} filling={filling} />
+        <Scooter
+          fillFrac={fillFrac}
+          targetFrac={targetFrac}
+          filling={filling}
+          overTank={overTank}
+          setOverTank={setOverTank}
+          onFillStart={onFillStart}
+          onFillStop={onFillStop}
+        />
+        <NozzleCursor overTank={overTank} filling={filling} />
         <ContactShadows position={[0, 0, 0]} opacity={0.35} scale={8} blur={2.4} far={2} />
+        {/* Kamera diam — hanya berputar saat pengguna menggeser area kosong */}
         <OrbitControls
           target={[0, 1, 0]}
           enablePan={false}
           enableZoom={false}
-          autoRotate={!filling}
-          autoRotateSpeed={1.1}
+          enabled={!overTank && !filling}
           minPolarAngle={0.7}
           maxPolarAngle={1.45}
         />
@@ -42,16 +61,26 @@ export function Motorbike3D({
 const TANK = { x: 0.05, w: 0.95, h: 0.95, d: 0.6, centerY: 1.3 };
 const TANK_BOTTOM = TANK.centerY - TANK.h / 2 + 0.05;
 const TANK_INNER_H = TANK.h - 0.12;
+// Posisi nozzle saat "dicolokkan" ke lubang tangki
+const NOZZLE_DOCK = new THREE.Vector3(TANK.x - 0.02, 2.12, 0);
+
+type FillHandlers = {
+  overTank: boolean;
+  setOverTank: (v: boolean) => void;
+  onFillStart: () => void;
+  onFillStop: () => void;
+};
 
 function Scooter({
   fillFrac,
   targetFrac,
   filling,
+  ...handlers
 }: {
   fillFrac: number;
   targetFrac: number;
   filling: boolean;
-}) {
+} & FillHandlers) {
   const bodyGlass = (
     <meshPhysicalMaterial
       color="#7ba3ef"
@@ -109,7 +138,7 @@ function Scooter({
       </mesh>
 
       {/* Tangki transparan + bensin */}
-      <FuelTank fillFrac={fillFrac} targetFrac={targetFrac} filling={filling} />
+      <FuelTank fillFrac={fillFrac} targetFrac={targetFrac} filling={filling} {...handlers} />
 
       {/* Lantai */}
       <mesh position={[0, -0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -145,11 +174,15 @@ function FuelTank({
   fillFrac,
   targetFrac,
   filling,
+  overTank,
+  setOverTank,
+  onFillStart,
+  onFillStop,
 }: {
   fillFrac: number;
   targetFrac: number;
   filling: boolean;
-}) {
+} & FillHandlers) {
   const fuelRef = useRef<THREE.Mesh>(null);
   const surfaceRef = useRef<THREE.Mesh>(null);
   const shownFrac = useRef(0);
@@ -185,17 +218,35 @@ function FuelTank({
         <meshStandardMaterial color="#9ec2ff" emissive="#6ea8ff" emissiveIntensity={0.4} />
       </mesh>
 
-      {/* Dinding tangki kaca */}
+      {/* Dinding tangki kaca — menyala saat nozzle diarahkan ke sini */}
       <RoundedBox args={[TANK.w, TANK.h, TANK.d]} radius={0.1} position={[0, TANK.centerY, 0]}>
         <meshPhysicalMaterial
-          color="#dbe7ff"
+          color={overTank ? "#aecbff" : "#dbe7ff"}
           transparent
-          opacity={0.18}
+          opacity={overTank ? 0.32 : 0.18}
           roughness={0.05}
           metalness={0}
           depthWrite={false}
         />
       </RoundedBox>
+
+      {/* Area sentuh nozzle (sedikit lebih besar dari tangki) */}
+      <mesh
+        position={[0, TANK.centerY + 0.08, 0]}
+        onPointerOver={() => setOverTank(true)}
+        onPointerOut={() => {
+          setOverTank(false);
+          onFillStop();
+        }}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onFillStart();
+        }}
+        onPointerUp={() => onFillStop()}
+      >
+        <boxGeometry args={[TANK.w + 0.3, TANK.h + 0.45, TANK.d + 0.3]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
 
       {/* Garis target pesanan (cincin merah) */}
       <mesh position={[0, targetY, 0]}>
@@ -209,20 +260,64 @@ function FuelTank({
         <meshStandardMaterial color="#2b2e33" roughness={0.4} metalness={0.6} />
       </mesh>
 
-      {/* Nozzle + aliran bensin saat mengisi */}
-      {filling && (
-        <group>
-          <mesh position={[0, 2.45, 0]} rotation={[0, 0, 0.5]}>
-            <boxGeometry args={[0.4, 0.16, 0.14]} />
-            <meshStandardMaterial color="#e5484d" roughness={0.5} />
-          </mesh>
-          <mesh position={[0.12, 2.25, 0]}>
-            <cylinderGeometry args={[0.035, 0.035, 0.35, 12]} />
-            <meshStandardMaterial color="#3a3e44" roughness={0.4} metalness={0.5} />
-          </mesh>
-          <FuelStream />
-        </group>
-      )}
+      {/* Aliran bensin dari nozzle saat mengisi */}
+      {filling && <FuelStream />}
+    </group>
+  );
+}
+
+/**
+ * Nozzle SPBU yang mengikuti kursor. Saat diarahkan ke tangki (atau saat
+ * mengisi lewat tombol) nozzle "dicolokkan" ke lubang tangki.
+ */
+function NozzleCursor({ overTank, filling }: { overTank: boolean; filling: boolean }) {
+  const ref = useRef<THREE.Group>(null);
+  const seenRef = useRef(false);
+  // Bidang di depan tangki tempat nozzle bergerak mengikuti kursor
+  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), -0.45), []);
+  const target = useMemo(() => new THREE.Vector3(), []);
+
+  useFrame((state) => {
+    if (!ref.current) return;
+    const docked = filling || overTank;
+    if (docked) {
+      target.copy(NOZZLE_DOCK);
+    } else {
+      state.raycaster.setFromCamera(state.pointer, state.camera);
+      if (!state.raycaster.ray.intersectPlane(plane, target)) return;
+      target.x = THREE.MathUtils.clamp(target.x, -2.4, 2.4);
+      target.y = THREE.MathUtils.clamp(target.y, 0.35, 2.7);
+      target.z = 0.45;
+    }
+    if (!seenRef.current && (state.pointer.x !== 0 || state.pointer.y !== 0)) {
+      seenRef.current = true;
+    }
+    ref.current.visible = seenRef.current;
+    ref.current.position.lerp(target, docked ? 0.22 : 0.55);
+  });
+
+  return (
+    <group ref={ref} visible={false}>
+      {/* selang ke atas */}
+      <mesh position={[-0.06, 0.55, 0]} rotation={[0, 0, 0.12]}>
+        <cylinderGeometry args={[0.045, 0.045, 0.75, 10]} />
+        <meshStandardMaterial color="#2b2e33" roughness={0.8} />
+      </mesh>
+      {/* bodi nozzle */}
+      <mesh position={[0, 0.12, 0]} rotation={[0, 0, -0.2]}>
+        <boxGeometry args={[0.2, 0.34, 0.16]} />
+        <meshStandardMaterial color="#e5484d" roughness={0.45} />
+      </mesh>
+      {/* tuas/gagang */}
+      <mesh position={[-0.15, 0.14, 0]} rotation={[0, 0, 0.55]}>
+        <boxGeometry args={[0.18, 0.06, 0.12]} />
+        <meshStandardMaterial color="#23262b" roughness={0.7} />
+      </mesh>
+      {/* moncong */}
+      <mesh position={[0.08, -0.12, 0]} rotation={[0, 0, 0.35]}>
+        <cylinderGeometry args={[0.032, 0.045, 0.34, 12]} />
+        <meshStandardMaterial color="#9aa3ad" metalness={0.7} roughness={0.3} />
+      </mesh>
     </group>
   );
 }
@@ -235,10 +330,11 @@ function FuelStream() {
       m.opacity = 0.65 + Math.sin(clock.elapsedTime * 24) * 0.2;
     }
   });
-  const top = 2.08;
+  // Dari moncong nozzle yang tercolok di tutup tangki ke dasar tangki
+  const top = 1.84;
   const bottom = TANK.centerY - TANK.h / 2 + 0.1;
   return (
-    <mesh ref={ref} position={[0.12, (top + bottom) / 2, 0]}>
+    <mesh ref={ref} position={[0.1, (top + bottom) / 2, 0]}>
       <cylinderGeometry args={[0.028, 0.04, top - bottom, 10]} />
       <meshStandardMaterial color="#5b94f5" transparent opacity={0.7} />
     </mesh>
