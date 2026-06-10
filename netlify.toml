@@ -1,0 +1,7 @@
+[build]
+  command = "NITRO_PRESET=netlify bun run build"
+  publish = "dist/client"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"

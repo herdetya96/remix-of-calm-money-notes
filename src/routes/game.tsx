@@ -1,7 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { ClientOnly, createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Fuel, Heart, RotateCcw, Trophy } from "lucide-react";
 import { Card } from "@/components/Card";
+import { Motorbike3D } from "@/components/Motorbike3D";
 
 export const Route = createFileRoute("/game")({
   head: () => ({
@@ -124,6 +125,7 @@ function GasStationGame() {
   const [round, setRound] = useState(1);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [highscore, setHighscore] = useState(0);
+  const [holding, setHolding] = useState(false);
 
   const holdingRef = useRef(false);
   const litersRef = useRef(0);
@@ -164,6 +166,7 @@ function GasStationGame() {
   const startFilling = useCallback(() => {
     if (holdingRef.current) return;
     holdingRef.current = true;
+    setHolding(true);
     setPhase("filling");
     holdStartRef.current = performance.now();
     lastTickRef.current = performance.now();
@@ -172,6 +175,7 @@ function GasStationGame() {
 
   const stopFilling = useCallback(() => {
     holdingRef.current = false;
+    setHolding(false);
   }, []);
 
   const handDelivery = () => {
@@ -252,11 +256,24 @@ function GasStationGame() {
             </div>
           </div>
 
-          <MotorbikeTank
-            fillFrac={fillFrac}
-            targetFrac={0.75}
-            filling={holdingRef.current && phase === "filling"}
-          />
+          <div className="w-full max-w-[560px]">
+            <ClientOnly
+              fallback={
+                <div className="w-full h-[280px] md:h-[340px] rounded-xl bg-ink-40 flex items-center justify-center text-[13px] text-ink-400">
+                  Menyiapkan motor 3D...
+                </div>
+              }
+            >
+              <Motorbike3D
+                fillFrac={fillFrac}
+                targetFrac={0.75}
+                filling={holding && phase === "filling"}
+              />
+            </ClientOnly>
+            <p className="mt-1.5 text-center text-[11px] text-ink-400">
+              Geser untuk memutar kamera · garis merah = batas pesanan
+            </p>
+          </div>
 
           {/* Kontrol */}
           {phase === "gameover" ? (
@@ -392,171 +409,5 @@ function PumpReadout({
         {value}
       </span>
     </div>
-  );
-}
-
-function MotorbikeTank({
-  fillFrac,
-  targetFrac,
-  filling,
-}: {
-  fillFrac: number;
-  targetFrac: number;
-  filling: boolean;
-}) {
-  // Tangki transparan: y dari 52 (penuh) sampai 122 (kosong)
-  const tankTop = 52;
-  const tankBottom = 122;
-  const liquidY = tankBottom - (tankBottom - tankTop) * fillFrac;
-  const targetY = tankBottom - (tankBottom - tankTop) * targetFrac;
-
-  return (
-    <svg
-      viewBox="0 0 360 210"
-      className="w-full max-w-[440px]"
-      role="img"
-      aria-label="Motor transparan dengan tangki bensin"
-    >
-      <defs>
-        <linearGradient id="fuelGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.9" />
-          <stop offset="100%" stopColor="#2e6de9" stopOpacity="0.95" />
-        </linearGradient>
-        <clipPath id="tankClip">
-          <path d="M118 60 Q118 48 132 48 L188 48 Q202 48 202 60 L202 110 Q202 126 184 126 L136 126 Q118 126 118 110 Z" />
-        </clipPath>
-      </defs>
-
-      {/* Tanah */}
-      <line
-        x1="14"
-        y1="186"
-        x2="346"
-        y2="186"
-        stroke="rgba(26,28,30,0.12)"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-
-      {/* Roda */}
-      <g stroke="rgba(26,28,30,0.55)" fill="none">
-        <circle cx="76" cy="156" r="30" strokeWidth="7" stroke="rgba(26,28,30,0.7)" />
-        <circle cx="76" cy="156" r="12" strokeWidth="2.5" />
-        <circle cx="284" cy="156" r="30" strokeWidth="7" stroke="rgba(26,28,30,0.7)" />
-        <circle cx="284" cy="156" r="12" strokeWidth="2.5" />
-      </g>
-
-      {/* Bodi transparan */}
-      <g
-        stroke="rgba(46,109,233,0.55)"
-        strokeWidth="2.5"
-        fill="rgba(46,109,233,0.06)"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      >
-        {/* rangka belakang + jok */}
-        <path d="M284 156 L240 96 Q236 88 226 88 L210 88 L202 60" fill="none" />
-        <path d="M196 86 Q230 78 252 84 Q262 87 258 96 L240 96 L210 88 Z" />
-        {/* dek tengah & bodi depan */}
-        <path
-          d="M118 112 Q96 116 88 132 Q84 142 96 144 L150 148 Q170 150 184 140 L202 110"
-          fill="none"
-        />
-        {/* garpu depan + setang */}
-        <path d="M76 156 L100 92 L94 70" fill="none" />
-        <path d="M82 64 Q94 58 106 66" fill="none" strokeWidth="4" />
-        {/* lampu depan */}
-        <circle
-          cx="99"
-          cy="86"
-          r="7"
-          fill="rgba(251,191,36,0.35)"
-          stroke="rgba(26,28,30,0.4)"
-          strokeWidth="2"
-        />
-      </g>
-
-      {/* Bensin di dalam tangki */}
-      <g clipPath="url(#tankClip)">
-        <rect
-          x="118"
-          y={liquidY}
-          width="84"
-          height={tankBottom - liquidY + 6}
-          fill="url(#fuelGrad)"
-        />
-        {/* permukaan bergelombang saat mengisi */}
-        {filling && fillFrac > 0.02 && (
-          <>
-            <ellipse cx="146" cy={liquidY + 10} rx="4" ry="4" fill="rgba(255,255,255,0.5)">
-              <animate
-                attributeName="cy"
-                values={`${liquidY + 26};${liquidY + 4}`}
-                dur="0.7s"
-                repeatCount="indefinite"
-              />
-            </ellipse>
-            <ellipse cx="172" cy={liquidY + 16} rx="3" ry="3" fill="rgba(255,255,255,0.45)">
-              <animate
-                attributeName="cy"
-                values={`${liquidY + 34};${liquidY + 6}`}
-                dur="0.9s"
-                repeatCount="indefinite"
-              />
-            </ellipse>
-          </>
-        )}
-        <rect x="118" y={liquidY - 1.5} width="84" height="3" fill="rgba(255,255,255,0.55)" />
-      </g>
-
-      {/* Dinding tangki transparan */}
-      <path
-        d="M118 60 Q118 48 132 48 L188 48 Q202 48 202 60 L202 110 Q202 126 184 126 L136 126 Q118 126 118 110 Z"
-        fill="rgba(255,255,255,0.08)"
-        stroke="rgba(26,28,30,0.6)"
-        strokeWidth="3"
-      />
-      {/* kilau kaca */}
-      <path d="M127 58 Q127 53 133 53 L142 53 L128 96 Z" fill="rgba(255,255,255,0.35)" />
-      {/* tutup tangki */}
-      <rect x="150" y="40" width="20" height="10" rx="4" fill="rgba(26,28,30,0.6)" />
-
-      {/* Garis target pesanan */}
-      <line
-        x1="110"
-        y1={targetY}
-        x2="210"
-        y2={targetY}
-        stroke="#e5484d"
-        strokeWidth="2"
-        strokeDasharray="5 4"
-      />
-      <text x="214" y={targetY + 4} fontSize="11" fill="#e5484d" fontWeight="600">
-        pesanan
-      </text>
-
-      {/* Selang & nozzle saat mengisi */}
-      {filling && (
-        <g>
-          <path
-            d="M160 16 Q160 30 160 38"
-            stroke="rgba(26,28,30,0.5)"
-            strokeWidth="5"
-            fill="none"
-            strokeLinecap="round"
-          />
-          <rect x="153" y="8" width="14" height="12" rx="3" fill="#e5484d" />
-          <line
-            x1="160"
-            y1="42"
-            x2="160"
-            y2={Math.max(liquidY - 2, 56)}
-            stroke="url(#fuelGrad)"
-            strokeWidth="4"
-            strokeLinecap="round"
-          />
-        </g>
-      )}
-    </svg>
   );
 }

@@ -12,4 +12,8 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Outside the Lovable sandbox the nitro deploy plugin is skipped unless forced.
+  // Set NITRO_PRESET (e.g. "netlify") to build a deployable server bundle locally/in CI;
+  // inside Lovable this stays undefined so the default cloudflare-module flow is untouched.
+  ...(process.env.NITRO_PRESET ? { nitro: { preset: process.env.NITRO_PRESET } } : {}),
 });
