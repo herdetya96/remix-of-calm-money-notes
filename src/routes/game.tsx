@@ -270,6 +270,8 @@ function GasStationGame() {
                 fillFrac={fillFrac}
                 targetFrac={0.75}
                 filling={holding && phase === "filling"}
+                departing={phase === "result" || phase === "gameover"}
+                bikeKey={round}
                 onFillStart={startFilling}
                 onFillStop={stopFilling}
               />

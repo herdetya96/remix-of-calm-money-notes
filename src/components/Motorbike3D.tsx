@@ -7,7 +7,7 @@ import {
   QuadraticBezierLine,
   RoundedBox,
 } from "@react-three/drei";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import * as THREE from "three";
 
 /**
@@ -19,12 +19,18 @@ export function Motorbike3D({
   fillFrac,
   targetFrac,
   filling,
+  departing,
+  bikeKey,
   onFillStart,
   onFillStop,
 }: {
   fillFrac: number;
   targetFrac: number;
   filling: boolean;
+  /** true saat ronde selesai — motor pergi meninggalkan SPBU */
+  departing: boolean;
+  /** berubah tiap pelanggan baru — memicu animasi motor datang */
+  bikeKey: number;
   onFillStart: () => void;
   onFillStop: () => void;
 }) {
@@ -32,7 +38,12 @@ export function Motorbike3D({
 
   return (
     <div className="w-full h-[280px] md:h-[340px] rounded-xl overflow-hidden cursor-none bg-gradient-to-b from-[#dce9fb] via-[#e8f0fb] to-[#cfdcf0]">
-      <Canvas shadows camera={{ position: [3.6, 2.1, 4.6], fov: 38 }} dpr={[1, 2]}>
+      <Canvas
+        shadows
+        gl={{ localClippingEnabled: true }}
+        camera={{ position: [3.6, 2.1, 4.6], fov: 38 }}
+        dpr={[1, 2]}
+      >
         <fog attach="fog" args={["#dfe8f6", 9, 18]} />
         <ambientLight intensity={0.45} />
         <directionalLight
@@ -63,15 +74,17 @@ export function Motorbike3D({
 
         <GasStationGround />
         <PumpMachine />
-        <Scooter
-          fillFrac={fillFrac}
-          targetFrac={targetFrac}
-          filling={filling}
-          overTank={overTank}
-          setOverTank={setOverTank}
-          onFillStart={onFillStart}
-          onFillStop={onFillStop}
-        />
+        <MovingBike departing={departing} bikeKey={bikeKey}>
+          <Scooter
+            fillFrac={fillFrac}
+            targetFrac={targetFrac}
+            filling={filling}
+            overTank={overTank}
+            setOverTank={setOverTank}
+            onFillStart={onFillStart}
+            onFillStop={onFillStop}
+          />
+        </MovingBike>
         <NozzleCursor overTank={overTank} filling={filling} />
         <ContactShadows position={[0, 0.03, 0]} opacity={0.3} scale={9} blur={2.6} far={2.2} />
 
@@ -95,10 +108,10 @@ const TANK_BOTTOM = TANK.centerY - TANK.h / 2 + 0.05;
 const TANK_INNER_H = TANK.h - 0.12;
 const FUEL_W = TANK.w - 0.14;
 const FUEL_D = TANK.d - 0.14;
-// Posisi nozzle saat "dicolokkan" ke lubang tangki
-const NOZZLE_DOCK = new THREE.Vector3(TANK.x - 0.02, 2.12, 0);
-// Titik jatuh aliran bensin (relatif grup tangki)
-const STREAM_X = 0.1;
+// Posisi nozzle saat "dicolokkan" ke lubang tangki (moncong tepat di tutup)
+const NOZZLE_DOCK = new THREE.Vector3(TANK.x - 0.25, 2.42, 0);
+// Titik jatuh aliran bensin (relatif grup tangki, segaris moncong nozzle)
+const STREAM_X = 0.14;
 
 type FillHandlers = {
   overTank: boolean;
@@ -172,6 +185,79 @@ function PumpMachine() {
 }
 
 // ───────────────────────── Motor ─────────────────────────
+
+/**
+ * Menggerakkan motor: melaju pergi saat ronde selesai (departing),
+ * lalu motor pelanggan baru masuk dari kiri saat bikeKey berubah.
+ * Roda (group bernama "wheelSpin") ikut berputar sesuai kecepatan.
+ */
+function MovingBike({
+  departing,
+  bikeKey,
+  children,
+}: {
+  departing: boolean;
+  bikeKey: number;
+  children: ReactNode;
+}) {
+  const ref = useRef<THREE.Group>(null);
+  const sim = useRef({
+    mode: "idle" as "idle" | "leaving" | "arriving" | "gone",
+    x: 0,
+    v: 0,
+    prevDeparting: departing,
+    prevKey: bikeKey,
+  });
+
+  useFrame((_, delta) => {
+    const s = sim.current;
+    const dt = Math.min(delta, 0.05);
+
+    if (departing && !s.prevDeparting) s.mode = "leaving";
+    s.prevDeparting = departing;
+    if (bikeKey !== s.prevKey) {
+      s.prevKey = bikeKey;
+      s.x = -7.5;
+      s.v = 0;
+      s.mode = "arriving";
+    }
+
+    if (s.mode === "leaving") {
+      s.v = Math.min(s.v + 7 * dt, 6);
+      s.x += s.v * dt;
+      if (s.x > 7.5) {
+        s.mode = "gone";
+        s.v = 0;
+      }
+    } else if (s.mode === "arriving") {
+      // ngebut dulu, mengerem halus mendekati pompa
+      const remaining = Math.max(-s.x, 0);
+      const targetV = Math.min(5, Math.max(0.9, remaining * 2.4));
+      s.v = THREE.MathUtils.lerp(s.v, targetV, 0.12);
+      s.x += s.v * dt;
+      if (s.x >= -0.005) {
+        s.x = 0;
+        s.v = 0;
+        s.mode = "idle";
+      }
+    }
+
+    const g = ref.current;
+    if (!g) return;
+    g.position.x = s.x;
+    g.visible = s.mode !== "gone";
+    // sedikit mengangguk saat berakselerasi/mengerem
+    const lean = s.mode === "leaving" ? -0.05 : s.mode === "arriving" ? 0.035 : 0;
+    g.rotation.z = THREE.MathUtils.lerp(g.rotation.z, lean, 0.08);
+    if (s.v > 0.01) {
+      g.traverse((o) => {
+        if (o.name === "wheelSpin") o.rotation.z -= (s.v * dt) / 0.48;
+      });
+    }
+  });
+
+  return <group ref={ref}>{children}</group>;
+}
 
 function useGlassMaterial() {
   return useMemo(
@@ -348,32 +434,35 @@ function Wheel({ x, disc }: { x: number; disc: boolean }) {
   const spokes = useMemo(() => [0, 1, 2, 3, 4].map((i) => (i * Math.PI * 2) / 5), []);
   return (
     <group position={[x, 0.48, 0]}>
-      <mesh castShadow>
-        <torusGeometry args={[0.34, 0.14, 14, 36]} />
-        <meshStandardMaterial color="#17191c" roughness={0.92} />
-      </mesh>
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.2, 0.2, 0.1, 24]} />
-        <meshStandardMaterial color="#aeb7c2" metalness={0.85} roughness={0.22} />
-      </mesh>
-      {spokes.map((rot) => (
-        <group key={rot} rotation={[0, 0, rot]}>
-          <mesh position={[0.15, 0, 0]}>
-            <boxGeometry args={[0.3, 0.045, 0.035]} />
-            <meshStandardMaterial color="#aeb7c2" metalness={0.8} roughness={0.25} />
-          </mesh>
-        </group>
-      ))}
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.07, 0.07, 0.14, 16]} />
-        <meshStandardMaterial color="#5c6570" metalness={0.7} roughness={0.3} />
-      </mesh>
-      {disc && (
-        <mesh position={[0, 0, 0.08]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.17, 0.17, 0.015, 24]} />
-          <meshStandardMaterial color="#d7dde4" metalness={0.9} roughness={0.35} />
+      {/* bagian yang ikut berputar saat motor berjalan */}
+      <group name="wheelSpin">
+        <mesh castShadow>
+          <torusGeometry args={[0.34, 0.14, 14, 36]} />
+          <meshStandardMaterial color="#17191c" roughness={0.92} />
         </mesh>
-      )}
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.2, 0.2, 0.1, 24]} />
+          <meshStandardMaterial color="#aeb7c2" metalness={0.85} roughness={0.22} />
+        </mesh>
+        {spokes.map((rot) => (
+          <group key={rot} rotation={[0, 0, rot]}>
+            <mesh position={[0.15, 0, 0]}>
+              <boxGeometry args={[0.3, 0.045, 0.035]} />
+              <meshStandardMaterial color="#aeb7c2" metalness={0.8} roughness={0.25} />
+            </mesh>
+          </group>
+        ))}
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.07, 0.07, 0.14, 16]} />
+          <meshStandardMaterial color="#5c6570" metalness={0.7} roughness={0.3} />
+        </mesh>
+        {disc && (
+          <mesh position={[0, 0, 0.08]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.17, 0.17, 0.015, 24]} />
+            <meshStandardMaterial color="#d7dde4" metalness={0.9} roughness={0.35} />
+          </mesh>
+        )}
+      </group>
     </group>
   );
 }
@@ -397,16 +486,18 @@ function FuelTank({
   // Tinggi permukaan (relatif grup tangki) dibagikan ke permukaan/gelembung/percikan
   const surfaceYRef = useRef(TANK_BOTTOM);
   const shownFrac = useRef(0);
+  // Cairan = balok membulat penuh yang dipotong bidang kliping tepat di permukaan,
+  // jadi sisinya mengikuti lengkung tangki — bukan kotak yang diskala
+  const clipPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, -1, 0), TANK_BOTTOM), []);
 
   useFrame(() => {
-    shownFrac.current = THREE.MathUtils.lerp(shownFrac.current, fillFrac, 0.25);
+    // turun lebih cepat saat dikuras (ganti pelanggan) daripada saat mengisi
+    const k = fillFrac < shownFrac.current ? 0.45 : 0.25;
+    shownFrac.current = THREE.MathUtils.lerp(shownFrac.current, fillFrac, k);
     const h = TANK_INNER_H * Math.max(shownFrac.current, 0.001);
     surfaceYRef.current = TANK_BOTTOM + h;
-    if (fuelRef.current) {
-      fuelRef.current.scale.y = h;
-      fuelRef.current.position.y = TANK_BOTTOM + h / 2;
-      fuelRef.current.visible = shownFrac.current > 0.004;
-    }
+    clipPlane.constant = surfaceYRef.current - 0.002;
+    if (fuelRef.current) fuelRef.current.visible = shownFrac.current > 0.004;
   });
 
   const targetY = TANK_BOTTOM + TANK_INNER_H * targetFrac;
@@ -414,17 +505,23 @@ function FuelTank({
   return (
     <group position={[TANK.x, 0, 0]}>
       {/* Badan cairan */}
-      <mesh ref={fuelRef}>
-        <boxGeometry args={[FUEL_W, 1, FUEL_D]} />
+      <RoundedBox
+        ref={fuelRef}
+        args={[FUEL_W, TANK_INNER_H + 0.04, FUEL_D]}
+        radius={0.09}
+        position={[0, TANK_BOTTOM + TANK_INNER_H / 2, 0]}
+      >
         <meshPhysicalMaterial
           color="#1d5fe0"
           transparent
-          opacity={0.88}
-          roughness={0.08}
-          clearcoat={0.6}
-          clearcoatRoughness={0.2}
+          opacity={0.9}
+          roughness={0.06}
+          clearcoat={0.8}
+          clearcoatRoughness={0.15}
+          clippingPlanes={[clipPlane]}
+          side={THREE.DoubleSide}
         />
-      </mesh>
+      </RoundedBox>
 
       {/* Permukaan bergelombang */}
       <FuelSurface surfaceYRef={surfaceYRef} shownFrac={shownFrac} filling={filling} />
@@ -667,7 +764,7 @@ function Splash({
 function FuelStream({ surfaceYRef }: { surfaceYRef: React.MutableRefObject<number> }) {
   const outerRef = useRef<THREE.Mesh>(null);
   const innerRef = useRef<THREE.Mesh>(null);
-  const TOP = 1.84;
+  const TOP = 1.78;
 
   useFrame(({ clock }) => {
     const len = Math.max(TOP - surfaceYRef.current, 0.05);
@@ -750,31 +847,62 @@ function NozzleCursor({ overTank, filling }: { overTank: boolean; filling: boole
   return (
     <>
       <group ref={ref} visible={false}>
-        {/* pangkal selang */}
-        <mesh position={[-0.05, 0.42, 0]} rotation={[0, 0, 0.12]}>
-          <cylinderGeometry args={[0.045, 0.045, 0.5, 10]} />
-          <meshStandardMaterial color="#2b2e33" roughness={0.8} />
+        {/* pangkal selang di atas gagang */}
+        <mesh position={[-0.16, 0.44, 0]}>
+          <cylinderGeometry args={[0.042, 0.042, 0.14, 12]} />
+          <meshStandardMaterial color="#15171a" roughness={0.8} />
         </mesh>
-        {/* bodi nozzle */}
-        <mesh position={[0, 0.12, 0]} rotation={[0, 0, -0.2]} castShadow>
-          <boxGeometry args={[0.2, 0.34, 0.16]} />
-          <meshStandardMaterial color="#e5484d" roughness={0.35} metalness={0.2} />
+        {/* gagang hitam (kolom belakang) */}
+        <RoundedBox args={[0.09, 0.4, 0.12]} radius={0.02} position={[-0.16, 0.2, 0]} castShadow>
+          <meshStandardMaterial color="#1b1d20" roughness={0.75} />
+        </RoundedBox>
+        {/* penutup biru bersudut khas nozzle otomatis */}
+        <RoundedBox args={[0.28, 0.28, 0.18]} radius={0.04} position={[0, 0.06, 0]} castShadow>
+          <meshStandardMaterial color="#2050d8" roughness={0.3} metalness={0.15} />
+        </RoundedBox>
+        <mesh position={[0.12, -0.05, 0]} rotation={[0, 0, 0.6]}>
+          <boxGeometry args={[0.2, 0.17, 0.165]} />
+          <meshStandardMaterial color="#2050d8" roughness={0.3} metalness={0.15} />
         </mesh>
-        {/* tuas */}
-        <mesh position={[-0.15, 0.14, 0]} rotation={[0, 0, 0.55]}>
-          <boxGeometry args={[0.18, 0.06, 0.12]} />
-          <meshStandardMaterial color="#23262b" roughness={0.7} />
+        <mesh position={[-0.1, 0.21, 0]} rotation={[0, 0, -0.45]}>
+          <boxGeometry args={[0.18, 0.12, 0.165]} />
+          <meshStandardMaterial color="#2050d8" roughness={0.3} metalness={0.15} />
         </mesh>
-        {/* pelindung tuas */}
-        <mesh position={[-0.1, 0.02, 0]} rotation={[0, 0, -0.5]}>
-          <torusGeometry args={[0.12, 0.018, 8, 18, Math.PI * 1.1]} />
-          <meshStandardMaterial color="#23262b" roughness={0.6} />
+        {/* pelindung tuas kotak (rangka U hitam) */}
+        <mesh position={[0.03, -0.31, 0]}>
+          <boxGeometry args={[0.04, 0.32, 0.09]} />
+          <meshStandardMaterial color="#1b1d20" roughness={0.7} />
         </mesh>
-        {/* moncong */}
-        <mesh position={[0.08, -0.12, 0]} rotation={[0, 0, 0.35]}>
-          <cylinderGeometry args={[0.032, 0.045, 0.34, 12]} />
-          <meshStandardMaterial color="#b9c2cc" metalness={0.85} roughness={0.2} />
+        <mesh position={[-0.08, -0.45, 0]}>
+          <boxGeometry args={[0.3, 0.04, 0.09]} />
+          <meshStandardMaterial color="#1b1d20" roughness={0.7} />
         </mesh>
+        <mesh position={[-0.21, -0.24, 0]}>
+          <boxGeometry args={[0.04, 0.44, 0.09]} />
+          <meshStandardMaterial color="#1b1d20" roughness={0.7} />
+        </mesh>
+        {/* tuas di dalam pelindung */}
+        <mesh position={[-0.05, -0.21, 0]} rotation={[0, 0, 0.45]}>
+          <boxGeometry args={[0.22, 0.035, 0.07]} />
+          <meshStandardMaterial color="#33363c" roughness={0.5} metalness={0.4} />
+        </mesh>
+        {/* leher per spiral + moncong krom */}
+        <group position={[0.16, -0.14, 0]} rotation={[0, 0, 0.45]}>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <mesh key={i} position={[0, -0.03 * i, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[0.05, 0.016, 8, 20]} />
+              <meshStandardMaterial color="#c8d0d9" metalness={0.9} roughness={0.25} />
+            </mesh>
+          ))}
+          <mesh position={[0, -0.33, 0]}>
+            <cylinderGeometry args={[0.03, 0.036, 0.36, 14]} />
+            <meshStandardMaterial color="#d4dbe2" metalness={0.9} roughness={0.15} />
+          </mesh>
+          <mesh position={[0, -0.51, 0]}>
+            <cylinderGeometry args={[0.042, 0.042, 0.06, 14]} />
+            <meshStandardMaterial color="#aeb7c2" metalness={0.85} roughness={0.3} />
+          </mesh>
+        </group>
       </group>
       <QuadraticBezierLine
         // @ts-expect-error drei menambahkan setPoints pada instance Line2
@@ -788,4 +916,4 @@ function NozzleCursor({ overTank, filling }: { overTank: boolean; filling: boole
   );
 }
 
-const HOSE_OFFSET = new THREE.Vector3(-0.05, 0.62, 0);
+const HOSE_OFFSET = new THREE.Vector3(-0.16, 0.5, 0);
