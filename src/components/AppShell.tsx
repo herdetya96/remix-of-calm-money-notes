@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutGrid, ListOrdered, PieChart, Settings, Search, Plus, PanelLeft } from "lucide-react";
+import { LayoutGrid, ListOrdered, PieChart, Settings, Search, Plus, PanelLeft, Fuel } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { AddTransactionModal } from "./AddTransactionModal";
 import { useProfile } from "@/lib/store";
@@ -8,6 +8,7 @@ const NAV = [
   { to: "/", label: "Overview", icon: LayoutGrid },
   { to: "/transactions", label: "Transactions", icon: ListOrdered },
   { to: "/analytics", label: "Analytics", icon: PieChart },
+  { to: "/game", label: "Pom Bensin", icon: Fuel },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
