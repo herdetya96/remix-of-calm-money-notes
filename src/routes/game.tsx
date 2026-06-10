@@ -165,13 +165,15 @@ function GasStationGame() {
 
   const startFilling = useCallback(() => {
     if (holdingRef.current) return;
+    // Nozzle 3D bisa diklik kapan saja — hanya boleh mengisi saat ronde berjalan
+    if (phase !== "ready" && phase !== "filling") return;
     holdingRef.current = true;
     setHolding(true);
     setPhase("filling");
     holdStartRef.current = performance.now();
     lastTickRef.current = performance.now();
     if (rafRef.current === null) rafRef.current = requestAnimationFrame(tick);
-  }, [tick]);
+  }, [tick, phase]);
 
   const stopFilling = useCallback(() => {
     holdingRef.current = false;
@@ -268,10 +270,13 @@ function GasStationGame() {
                 fillFrac={fillFrac}
                 targetFrac={0.75}
                 filling={holding && phase === "filling"}
+                onFillStart={startFilling}
+                onFillStop={stopFilling}
               />
             </ClientOnly>
             <p className="mt-1.5 text-center text-[11px] text-ink-400">
-              Geser untuk memutar kamera · garis merah = batas pesanan
+              Arahkan nozzle ke tangki lalu tahan klik untuk mengisi · geser area kosong untuk
+              memutar kamera · garis merah = batas pesanan
             </p>
           </div>
 
@@ -334,7 +339,8 @@ function GasStationGame() {
                 </button>
               </div>
               <p className="text-[12px] text-ink-400">
-                Tahan tombol merah untuk mengisi — tap singkat untuk menambah sedikit demi sedikit
+                Tahan tombol merah atau tahan klik nozzle di tangki — tap singkat untuk menambah
+                sedikit demi sedikit
               </p>
             </div>
           )}
